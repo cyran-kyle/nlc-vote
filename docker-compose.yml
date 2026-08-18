@@ -1,0 +1,92 @@
+services:
+  # ============================================================================
+  # 1. DATABASE SERVICE (MySQL 8.0 / InnoDB)
+  # ============================================================================
+  db:
+    image: mysql:8.0
+    container_name: nlc_voting_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-nlc_secure_password_2026}
+      MYSQL_DATABASE: ${DB_NAME:-nlc_voting_db}
+      MYSQL_USER: ${DB_USER:-nlc_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-nlc_secure_password_2026}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - voting_net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ============================================================================
+  # 2. BACKEND API SERVICE (Node.js / Express / TypeScript)
+  # ============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nlc_voting_backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-nlc_user}
+      DB_PASSWORD: ${DB_PASSWORD:-nlc_secure_password_2026}
+      DB_NAME: ${DB_NAME:-nlc_voting_db}
+      DB_CONNECTION_LIMIT: 25
+      LEVANTER_MOCK_MODE: ${LEVANTER_MOCK_MODE:-false}
+      LEVANTER_API_URL: ${LEVANTER_API_URL:-http://82.208.23.107:2030}
+      LEVANTER_API_KEY: ${LEVANTER_API_KEY:-52d192da6e86b2e9121f15079b879c57}
+      LEVANTER_ENDPOINT_PATH: ${LEVANTER_ENDPOINT_PATH:-/api/send}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-nlc_admin_2026}
+      JWT_SECRET: ${JWT_SECRET:-super_secret_voting_jwt_key_newlife_2026_98374921}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-5}
+      MAX_OTP_PER_WINDOW: ${MAX_OTP_PER_WINDOW:-5}
+      RATE_LIMIT_WINDOW_MINUTES: ${RATE_LIMIT_WINDOW_MINUTES:-15}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - voting_net
+
+  # ============================================================================
+  # 3. FRONTEND SERVICE (Next.js 14 App Router)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+    container_name: nlc_voting_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+    depends_on:
+      - backend
+    networks:
+      - voting_net
+
+# Persistent MySQL Volume
+volumes:
+  db_data:
+    driver: local
+
+# Internal Isolated Bridge Network
+networks:
+  voting_net:
+    driver: bridge
