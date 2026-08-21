@@ -294,4 +294,131 @@ Timestamp: ${new Date().toISOString()}`;
 
     return this.sendMessage(testPhone, message);
   }
+
+  /**
+   * Dispatches messages to a list of voter recipients with pacing to respect gateway rate limits
+   */
+  public static async sendBulkBroadcast(
+    recipients: Array<{ phone_number: string; full_name: string; student_id: string }>,
+    messageBuilder: (r: { phone_number: string; full_name: string; student_id: string }) => string
+  ): Promise<{ total: number; sent: number; failed: number }> {
+    let sent = 0;
+    let failed = 0;
+
+    for (const r of recipients) {
+      try {
+        const text = messageBuilder(r);
+        const res = await this.sendMessage(r.phone_number, text);
+        if (res.success) {
+          sent++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        console.error(`[Levanter Broadcast] Failed for ${r.phone_number}:`, err);
+        failed++;
+      }
+      // Pacing delay between recipients (80ms)
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+
+    return { total: recipients.length, sent, failed };
+  }
+
+  /**
+   * Broadcast Polls Open announcement
+   */
+  public static async broadcastPollsOpen(
+    recipients: Array<{ phone_number: string; full_name: string; student_id: string }>,
+    clientUrl: string,
+    electionTitle: string
+  ): Promise<{ total: number; sent: number; failed: number }> {
+    return this.sendBulkBroadcast(recipients, (r) => {
+      return `🗳️ *NEW LIFE COLLEGE ELECTIONS — POLLS ARE OPEN!*
+━━━━━━━━━━━━━━━━━━━━━━
+Hello *${r.full_name}*,
+
+The official voting polls for *${electionTitle}* are now officially *OPEN*!
+
+👉 *Cast Your Confidential Ballot Now:*
+${clientUrl}
+
+📌 *Simple Steps to Vote:*
+1. Enter your Student ID: \`${r.student_id}\`
+2. Receive your 6-digit WhatsApp OTP
+3. Select your preferred candidates and confirm your submission.
+
+🔒 Your vote is 100% secret, tamper-proof, and anonymous.
+
+_Electoral Commission, New Life College_`;
+    });
+  }
+
+  /**
+   * Broadcast Polls Closed announcement
+   */
+  public static async broadcastPollsClosed(
+    recipients: Array<{ phone_number: string; full_name: string; student_id: string }>,
+    clientUrl: string,
+    electionTitle: string
+  ): Promise<{ total: number; sent: number; failed: number }> {
+    return this.sendBulkBroadcast(recipients, (r) => {
+      return `🔒 *NEW LIFE COLLEGE ELECTIONS — POLLS ARE CLOSED*
+━━━━━━━━━━━━━━━━━━━━━━
+Hello *${r.full_name}*,
+
+Voting for *${electionTitle}* has officially *CONCLUDED*.
+
+Thank you for participating and making your voice heard! The Electoral Commission is now collating and certifying final tallies.
+
+📊 *Follow Live Certified Results:*
+${clientUrl}/results
+
+_Electoral Commission, New Life College_`;
+    });
+  }
+
+  /**
+   * Broadcast Election Winners announcement to all voters
+   */
+  public static async broadcastWinners(
+    recipients: Array<{ phone_number: string; full_name: string; student_id: string }>,
+    winnersList: Array<{
+      position_title: string;
+      candidate_name: string;
+      running_mate: string | null;
+      vote_count: number;
+      percentage: number;
+    }>,
+    clientUrl: string,
+    electionTitle: string
+  ): Promise<{ total: number; sent: number; failed: number }> {
+    const winnersFormatted = winnersList
+      .map((w) => {
+        const runningMate = w.running_mate ? ` (Vice: ${w.running_mate})` : '';
+        return `👑 *${w.position_title}:*\n👉 *${w.candidate_name}*${runningMate}\n   Votes: ${w.vote_count} (${w.percentage}%)`;
+      })
+      .join('\n\n');
+
+    return this.sendBulkBroadcast(recipients, (r) => {
+      return `🏆 *OFFICIAL ELECTION WINNERS ANNOUNCEMENT* 🏆
+━━━━━━━━━━━━━━━━━━━━━━
+*${electionTitle}*
+*New Life College Student Representative Council*
+
+Hello *${r.full_name}*,
+
+The Electoral Commission is proud to announce your newly elected student leaders for the 2026/2027 Academic Year:
+
+${winnersFormatted}
+
+━━━━━━━━━━━━━━━━━━━━━━
+📊 *Full Certified Results & Tallies:*
+${clientUrl}/results
+
+Congratulations to all newly elected SRC Executives!
+
+_Electoral Commission, New Life College_`;
+    });
+  }
 }

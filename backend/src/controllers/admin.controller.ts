@@ -764,12 +764,19 @@ export class AdminController {
    * Toggle Election Voting Polls Open/Closed
    */
   public static async toggleElectionPolls(req: Request, res: Response): Promise<void> {
-    const { is_open } = req.body;
+    const { is_open, broadcast } = req.body;
     const shouldOpen = typeof is_open === 'boolean' ? is_open : true;
+    const shouldBroadcast = typeof broadcast === 'boolean' ? broadcast : true;
 
     try {
       const db = getDbPool();
       await db.query('UPDATE elections SET is_active = ? ORDER BY created_at DESC LIMIT 1', [shouldOpen]);
+
+      // Fetch election details
+      const [elections] = await db.query<RowDataPacket[]>(
+        'SELECT id, title FROM elections ORDER BY created_at DESC LIMIT 1'
+      );
+      const electionTitle = elections[0]?.title || 'New Life College SRC Elections';
 
       await db.query(
         'INSERT INTO audit_logs (event_type, description, ip_address, user_agent) VALUES (?, ?, ?, ?)',
@@ -781,14 +788,278 @@ export class AdminController {
         ]
       );
 
+      // Asynchronously trigger broadcast to all approved voters if requested
+      if (shouldBroadcast) {
+        (async () => {
+          try {
+            const [voters] = await db.query<VoterRow[]>(
+              "SELECT student_id, full_name, phone_number FROM voter_ledger WHERE status = 'APPROVED'"
+            );
+            if (voters.length > 0) {
+              if (shouldOpen) {
+                await LevanterService.broadcastPollsOpen(voters, config.clientUrl, electionTitle);
+              } else {
+                await LevanterService.broadcastPollsClosed(voters, config.clientUrl, electionTitle);
+              }
+            }
+          } catch (bErr) {
+            console.error('[Broadcast on Poll Toggle Error]:', bErr);
+          }
+        })();
+      }
+
       res.status(200).json({
         success: true,
-        message: `Election voting polls are now ${shouldOpen ? 'OPEN' : 'CLOSED'}.`,
+        message: `Election voting polls are now ${shouldOpen ? 'OPEN' : 'CLOSED'}.${shouldBroadcast ? ' WhatsApp broadcast dispatched to voters.' : ''}`,
         data: { is_polls_open: shouldOpen },
       });
     } catch (error: any) {
       console.error('[AdminController.toggleElectionPolls] Error:', error);
       res.status(500).json({ success: false, message: 'Failed to toggle election polls status.' });
+    }
+  }
+
+  /**
+   * Broadcast Polls Open announcement explicitly to all registered voters
+   */
+  public static async broadcastPollsOpen(req: Request, res: Response): Promise<void> {
+    try {
+      const db = getDbPool();
+      const [elections] = await db.query<RowDataPacket[]>(
+        'SELECT id, title FROM elections ORDER BY created_at DESC LIMIT 1'
+      );
+      const electionTitle = elections[0]?.title || 'New Life College SRC Elections';
+
+      const [voters] = await db.query<VoterRow[]>(
+        "SELECT student_id, full_name, phone_number FROM voter_ledger WHERE status = 'APPROVED'"
+      );
+
+      if (voters.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'No approved registered voters found to broadcast to.',
+        });
+        return;
+      }
+
+      // Trigger asynchronous broadcast
+      LevanterService.broadcastPollsOpen(voters, config.clientUrl, electionTitle).catch((err) =>
+        console.error('[AdminController.broadcastPollsOpen] Error in background task:', err)
+      );
+
+      await db.query(
+        'INSERT INTO audit_logs (event_type, description, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+        [
+          'BROADCAST_POLLS_OPEN',
+          `Admin triggered Polls Open WhatsApp broadcast to ${voters.length} approved voters`,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+        ]
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Polls Open notification broadcast queued for ${voters.length} registered voters.`,
+        data: { voter_count: voters.length },
+      });
+    } catch (error: any) {
+      console.error('[AdminController.broadcastPollsOpen] Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to dispatch polls open broadcast.' });
+    }
+  }
+
+  /**
+   * Broadcast Polls Closed announcement explicitly to all registered voters
+   */
+  public static async broadcastPollsClosed(req: Request, res: Response): Promise<void> {
+    try {
+      const db = getDbPool();
+      const [elections] = await db.query<RowDataPacket[]>(
+        'SELECT id, title FROM elections ORDER BY created_at DESC LIMIT 1'
+      );
+      const electionTitle = elections[0]?.title || 'New Life College SRC Elections';
+
+      const [voters] = await db.query<VoterRow[]>(
+        "SELECT student_id, full_name, phone_number FROM voter_ledger WHERE status = 'APPROVED'"
+      );
+
+      if (voters.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'No approved registered voters found to broadcast to.',
+        });
+        return;
+      }
+
+      // Trigger asynchronous broadcast
+      LevanterService.broadcastPollsClosed(voters, config.clientUrl, electionTitle).catch((err) =>
+        console.error('[AdminController.broadcastPollsClosed] Error in background task:', err)
+      );
+
+      await db.query(
+        'INSERT INTO audit_logs (event_type, description, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+        [
+          'BROADCAST_POLLS_CLOSED',
+          `Admin triggered Polls Closed WhatsApp broadcast to ${voters.length} approved voters`,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+        ]
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Polls Closed notification broadcast queued for ${voters.length} registered voters.`,
+        data: { voter_count: voters.length },
+      });
+    } catch (error: any) {
+      console.error('[AdminController.broadcastPollsClosed] Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to dispatch polls closed broadcast.' });
+    }
+  }
+
+  /**
+   * Calculate Official Winners for each portfolio and broadcast to all registered voters
+   */
+  public static async broadcastWinners(req: Request, res: Response): Promise<void> {
+    try {
+      const db = getDbPool();
+
+      // Fetch election
+      const [elections] = await db.query<RowDataPacket[]>(
+        'SELECT id, title FROM elections ORDER BY created_at DESC LIMIT 1'
+      );
+
+      if (elections.length === 0) {
+        res.status(404).json({ success: false, message: 'No active election found.' });
+        return;
+      }
+
+      const election = elections[0];
+
+      // Fetch all positions, candidates, and vote tallies
+      const [results] = await db.query<RowDataPacket[]>(
+        `SELECT 
+          p.id AS position_id,
+          p.title AS position_title,
+          p.display_order AS position_order,
+          c.id AS candidate_id,
+          c.full_name AS candidate_name,
+          c.running_mate,
+          COUNT(v.vote_id) AS vote_count
+         FROM positions p
+         INNER JOIN candidates c ON p.id = c.position_id
+         LEFT JOIN votes v ON c.id = v.candidate_id AND v.election_id = ?
+         WHERE p.election_id = ?
+         GROUP BY p.id, p.title, p.display_order, c.id, c.full_name, c.running_mate
+         ORDER BY p.display_order ASC, vote_count DESC`,
+        [election.id, election.id]
+      );
+
+      if (results.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'No candidates or positions configured to determine winners.',
+        });
+        return;
+      }
+
+      // Group by position and determine winner (candidate with most votes)
+      const positionMap = new Map<string, {
+        position_title: string;
+        display_order: number;
+        total_votes: number;
+        candidates: Array<{
+          name: string;
+          running_mate: string | null;
+          votes: number;
+        }>;
+      }>();
+
+      for (const row of results) {
+        const pId = row.position_id;
+        const count = Number(row.vote_count || 0);
+
+        if (!positionMap.has(pId)) {
+          positionMap.set(pId, {
+            position_title: row.position_title,
+            display_order: row.position_order,
+            total_votes: 0,
+            candidates: [],
+          });
+        }
+
+        const pos = positionMap.get(pId)!;
+        pos.total_votes += count;
+        pos.candidates.push({
+          name: row.candidate_name,
+          running_mate: row.running_mate,
+          votes: count,
+        });
+      }
+
+      // Extract winner list
+      const winnersList: Array<{
+        position_title: string;
+        candidate_name: string;
+        running_mate: string | null;
+        vote_count: number;
+        percentage: number;
+      }> = [];
+
+      for (const pos of Array.from(positionMap.values())) {
+        if (pos.candidates.length > 0) {
+          const leader = pos.candidates[0]; // Ordered by vote_count DESC
+          const pct = pos.total_votes > 0 ? Math.round((leader.votes / pos.total_votes) * 100) : 0;
+
+          winnersList.push({
+            position_title: pos.position_title,
+            candidate_name: leader.name,
+            running_mate: leader.running_mate,
+            vote_count: leader.votes,
+            percentage: pct,
+          });
+        }
+      }
+
+      // Fetch approved voters
+      const [voters] = await db.query<VoterRow[]>(
+        "SELECT student_id, full_name, phone_number FROM voter_ledger WHERE status = 'APPROVED'"
+      );
+
+      if (voters.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'No approved registered voters found to broadcast winners to.',
+        });
+        return;
+      }
+
+      // Dispatch asynchronous broadcast to all voters
+      LevanterService.broadcastWinners(voters, winnersList, config.clientUrl, election.title).catch((err) =>
+        console.error('[AdminController.broadcastWinners] Error in background broadcast task:', err)
+      );
+
+      await db.query(
+        'INSERT INTO audit_logs (event_type, description, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+        [
+          'BROADCAST_ELECTION_WINNERS',
+          `Admin broadcast official SRC winners announcement to ${voters.length} registered voters for ${winnersList.length} portfolios`,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+        ]
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Official election winners announcement broadcast queued for ${voters.length} registered voters across ${winnersList.length} portfolios.`,
+        data: {
+          winners: winnersList,
+          voter_count: voters.length,
+        },
+      });
+    } catch (error: any) {
+      console.error('[AdminController.broadcastWinners] Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to broadcast election winners.' });
     }
   }
 

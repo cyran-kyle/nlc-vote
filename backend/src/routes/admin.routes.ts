@@ -37,6 +37,9 @@ router.post('/nominees/import', upload.single('file'), AdminController.bulkImpor
 
 // Election Polls & Registration Management
 router.post('/election/toggle-polls', AdminController.toggleElectionPolls);
+router.post('/broadcast/polls-open', AdminController.broadcastPollsOpen);
+router.post('/broadcast/polls-closed', AdminController.broadcastPollsClosed);
+router.post('/broadcast/winners', AdminController.broadcastWinners);
 router.post('/registration/toggle', AdminController.toggleRegistrationPortal);
 router.get('/registrations/pending', AdminController.getPendingRegistrations);
 router.post('/registrations/:student_id/approve', AdminController.approveRegistration);

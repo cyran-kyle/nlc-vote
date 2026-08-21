@@ -32,6 +32,9 @@ import {
   ChevronRight,
   Camera,
   User,
+  Megaphone,
+  Trophy,
+  Radio,
 } from 'lucide-react';
 
 const API_BASE_URL =
@@ -117,6 +120,8 @@ export default function AdminPage() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [togglingReg, setTogglingReg] = useState(false);
   const [togglingPolls, setTogglingPolls] = useState(false);
+  const [broadcastingType, setBroadcastingType] = useState<'open' | 'closed' | 'winners' | null>(null);
+  const [showWinnersModal, setShowWinnersModal] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Add Single Student Modal
@@ -310,6 +315,61 @@ export default function AdminPage() {
       showAlert('error', err.message);
     } finally {
       setTogglingPolls(false);
+    }
+  };
+
+  // Broadcast Polls Open Notice to All Voters
+  const handleBroadcastPollsOpen = async () => {
+    if (!confirm('Broadcast "Polls Open" notification with voting portal link to ALL registered voters on WhatsApp?')) {
+      return;
+    }
+    setBroadcastingType('open');
+    try {
+      const res = await authFetch('/admin/broadcast/polls-open', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showAlert('success', data.message);
+      loadStats();
+    } catch (err: any) {
+      showAlert('error', err.message);
+    } finally {
+      setBroadcastingType(null);
+    }
+  };
+
+  // Broadcast Polls Closed Notice to All Voters
+  const handleBroadcastPollsClosed = async () => {
+    if (!confirm('Broadcast "Polls Closed" notification with live results link to ALL registered voters on WhatsApp?')) {
+      return;
+    }
+    setBroadcastingType('closed');
+    try {
+      const res = await authFetch('/admin/broadcast/polls-closed', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showAlert('success', data.message);
+      loadStats();
+    } catch (err: any) {
+      showAlert('error', err.message);
+    } finally {
+      setBroadcastingType(null);
+    }
+  };
+
+  // Broadcast Official Election Winners to All Voters
+  const handleBroadcastWinners = async () => {
+    setBroadcastingType('winners');
+    try {
+      const res = await authFetch('/admin/broadcast/winners', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showAlert('success', data.message);
+      setShowWinnersModal(false);
+      loadStats();
+    } catch (err: any) {
+      showAlert('error', err.message);
+    } finally {
+      setBroadcastingType(null);
     }
   };
 
@@ -1011,6 +1071,90 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {/* Voter WhatsApp Broadcast Center */}
+          <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                  <Megaphone className="w-4 h-4 text-cyan-400" />
+                  <span>Voter WhatsApp Broadcast Center</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Send mass updates and certified winners announcements directly to all approved voters' WhatsApp.
+                </p>
+              </div>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 font-semibold self-start sm:self-auto flex items-center space-x-1">
+                <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+                <span>{stats.metrics.total_approved} Approved Voters Target</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Broadcast Polls Open */}
+              <button
+                onClick={handleBroadcastPollsOpen}
+                disabled={broadcastingType !== null}
+                className="p-4 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-700/80 hover:border-emerald-500/50 text-left transition-all group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Vote className="w-4 h-4" />
+                  </div>
+                  {broadcastingType === 'open' && <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white group-hover:text-emerald-300">Broadcast Polls Open</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                    Dispatches the official voting link and step-by-step voting instructions to all voters.
+                  </p>
+                </div>
+              </button>
+
+              {/* Broadcast Polls Closed */}
+              <button
+                onClick={handleBroadcastPollsClosed}
+                disabled={broadcastingType !== null}
+                className="p-4 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-700/80 hover:border-amber-500/50 text-left transition-all group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  {broadcastingType === 'closed' && <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white group-hover:text-amber-300">Broadcast Polls Closed</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                    Informs voters that voting has concluded and shares the link to monitor live collation.
+                  </p>
+                </div>
+              </button>
+
+              {/* Broadcast Election Winners */}
+              <button
+                onClick={() => setShowWinnersModal(true)}
+                disabled={broadcastingType !== null}
+                className="p-4 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-600/10 hover:from-amber-500/30 hover:to-yellow-600/20 border border-amber-500/40 text-left transition-all group flex flex-col justify-between space-y-3 shadow-lg shadow-amber-500/5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-8 h-8 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center">
+                    <Trophy className="w-4 h-4" />
+                  </div>
+                  {broadcastingType === 'winners' && <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-amber-300 flex items-center space-x-1">
+                    <span>Broadcast Official Winners</span>
+                    <Sparkles className="w-3 h-3 text-yellow-400" />
+                  </h4>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-snug">
+                    Calculates leading candidates and announces newly elected SRC leaders to all voters.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Quick Actions & Audit Logs */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-slate-800 space-y-4">
@@ -1370,6 +1514,14 @@ export default function AdminPage() {
                   className="hidden"
                 />
               </label>
+
+              <button
+                onClick={() => setShowWinnersModal(true)}
+                className="p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center space-x-1.5 shadow transition-all"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span>Broadcast Winners</span>
+              </button>
 
               <button
                 onClick={() => setShowAddPositionModal(true)}
@@ -1848,6 +2000,75 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: BROADCAST WINNERS CONFIRMATION */}
+      {showWinnersModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel max-w-lg w-full rounded-2xl p-6 sm:p-7 border border-amber-500/40 shadow-2xl space-y-5">
+            <div className="flex items-center space-x-3 pb-3 border-b border-slate-800">
+              <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Broadcast Official Election Winners</h3>
+                <p className="text-xs text-slate-400">
+                  Notify all approved voters on WhatsApp with the certified winners.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Target Recipients:</span>
+                <span className="font-bold text-emerald-400">{stats?.metrics?.total_approved || 0} Approved Voters</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Ballots Cast:</span>
+                <span className="font-bold text-white font-mono">{stats?.metrics?.total_voted || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Turnout:</span>
+                <span className="font-bold text-[#ffb606] font-mono">{stats?.metrics?.turnout_percentage || 0}%</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-200 leading-relaxed flex items-start space-x-2">
+              <Sparkles className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong>Official Action:</strong> The system will automatically compute the winning candidate for every contested portfolio and dispatch a formatted WhatsApp message to all registered voters announcing their new SRC representatives.
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                disabled={broadcastingType === 'winners'}
+                onClick={() => setShowWinnersModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={broadcastingType === 'winners'}
+                onClick={handleBroadcastWinners}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-lg shadow-amber-500/20"
+              >
+                {broadcastingType === 'winners' ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Dispatching Broadcast...</span>
+                  </>
+                ) : (
+                  <>
+                    <Megaphone className="w-3.5 h-3.5" />
+                    <span>Confirm & Broadcast to All Voters</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
