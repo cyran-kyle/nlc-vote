@@ -35,7 +35,8 @@ router.post('/candidates/:id/photo', upload.single('photo'), AdminController.upl
 router.delete('/candidates/:id', AdminController.deleteCandidate);
 router.post('/nominees/import', upload.single('file'), AdminController.bulkImportNominees);
 
-// Registration Management & Approvals
+// Election Polls & Registration Management
+router.post('/election/toggle-polls', AdminController.toggleElectionPolls);
 router.post('/registration/toggle', AdminController.toggleRegistrationPortal);
 router.get('/registrations/pending', AdminController.getPendingRegistrations);
 router.post('/registrations/:student_id/approve', AdminController.approveRegistration);

@@ -35,6 +35,20 @@ export class AuthController {
     try {
       const db = getDbPool();
 
+      // 0. Verify that election polls are currently open
+      const [elections] = await db.query<RowDataPacket[]>(
+        'SELECT id, is_active FROM elections ORDER BY created_at DESC LIMIT 1'
+      );
+
+      if (elections.length === 0 || !elections[0].is_active) {
+        res.status(403).json({
+          success: false,
+          polls_closed: true,
+          message: 'Voting polls are currently closed. Student authentication is suspended.',
+        });
+        return;
+      }
+
       // 1. Fetch student record from voter_ledger
       const [rows] = await db.query<VoterRow[]>(
         'SELECT student_id, full_name, department, level, phone_number, has_voted, status, last_otp_request_at FROM voter_ledger WHERE student_id = ?',

@@ -50,6 +50,7 @@ interface DashboardStats {
     total_candidates: number;
     total_votes_recorded: number;
     is_registration_open: boolean;
+    is_polls_open: boolean;
   };
   levanter: {
     api_url: string;
@@ -115,6 +116,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [togglingReg, setTogglingReg] = useState(false);
+  const [togglingPolls, setTogglingPolls] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Add Single Student Modal
@@ -285,6 +287,30 @@ export default function AdminPage() {
     setToken(null);
     sessionStorage.removeItem('nlc_admin_jwt');
     showAlert('success', 'Logged out successfully.');
+  };
+
+  // Toggle Election Voting Polls Open/Closed
+  const handleTogglePolls = async () => {
+    const currentStatus = Boolean(stats?.metrics?.is_polls_open);
+    const nextStatus = !currentStatus;
+    setTogglingPolls(true);
+
+    try {
+      const res = await authFetch('/admin/election/toggle-polls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_open: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      showAlert('success', data.message);
+      loadStats();
+    } catch (err: any) {
+      showAlert('error', err.message);
+    } finally {
+      setTogglingPolls(false);
+    }
   };
 
   // Toggle Self-Registration Portal Open/Closed
@@ -763,6 +789,7 @@ export default function AdminPage() {
   }
 
   const isRegOpen = Boolean(stats?.metrics?.is_registration_open);
+  const isPollsOpen = Boolean(stats?.metrics?.is_polls_open);
   const pendingCount = stats?.metrics?.total_pending_approval ?? pendingVoters.length;
 
   return (
@@ -804,26 +831,51 @@ export default function AdminPage() {
           </p>
         </div>
 
-        {/* Global Controls & Registration Portal Switcher */}
+        {/* Global Controls & Registration/Polls Switchers */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Polls Status Toggle Button */}
+          <button
+            onClick={handleTogglePolls}
+            disabled={togglingPolls}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center space-x-2 transition-all shadow-sm ${
+              isPollsOpen
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                : 'bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20'
+            }`}
+            title="Toggle Live Voting Polls for Students"
+          >
+            {isPollsOpen ? (
+              <>
+                <ToggleRight className="w-4 h-4 text-emerald-400" />
+                <span>Polls: OPEN</span>
+              </>
+            ) : (
+              <>
+                <ToggleLeft className="w-4 h-4 text-red-400" />
+                <span>Polls: CLOSED</span>
+              </>
+            )}
+          </button>
+
           {/* Registration Portal Toggle Button */}
           <button
             onClick={handleToggleRegistration}
             disabled={togglingReg}
             className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center space-x-2 transition-all shadow-sm ${
               isRegOpen
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20'
+                ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20'
+                : 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20'
             }`}
+            title="Toggle Student Self-Registration Portal"
           >
             {isRegOpen ? (
               <>
-                <ToggleRight className="w-4 h-4 text-emerald-400" />
+                <ToggleRight className="w-4 h-4 text-cyan-400" />
                 <span>Registration: OPEN</span>
               </>
             ) : (
               <>
-                <ToggleLeft className="w-4 h-4 text-red-400" />
+                <ToggleLeft className="w-4 h-4 text-amber-400" />
                 <span>Registration: CLOSED</span>
               </>
             )}
@@ -947,12 +999,14 @@ export default function AdminPage() {
             </div>
 
             <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Portal Status</span>
-              <div className={`text-xl sm:text-2xl font-extrabold font-mono ${isRegOpen ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isRegOpen ? 'OPEN' : 'CLOSED'}
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Election State</span>
+              <div className="flex items-center space-x-2">
+                <span className={`text-lg sm:text-xl font-extrabold font-mono ${isPollsOpen ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isPollsOpen ? 'POLLS OPEN' : 'POLLS CLOSED'}
+                </span>
               </div>
-              <div className="text-[11px] text-slate-400">
-                Levanter Gateway: <span className="text-emerald-400 font-bold">ONLINE</span>
+              <div className="text-[11px] text-slate-400 pt-0.5">
+                Registration: <span className={isRegOpen ? 'text-cyan-400 font-semibold' : 'text-amber-400 font-semibold'}>{isRegOpen ? 'OPEN' : 'CLOSED'}</span>
               </div>
             </div>
           </div>

@@ -8,6 +8,9 @@ import {
 
 const router = Router();
 
+// Route: Get current polls and registration status
+router.get('/status', ElectionController.getStatus);
+
 // Route: Get active election ballot (positions & candidates)
 router.get('/ballot', ElectionController.getBallot);
 

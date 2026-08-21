@@ -31,10 +31,10 @@ export default function RootLayout({
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/health`);
-        const data = await res.json();
-        if (res.ok && data.status === 'UP') {
-          setPollStatus('open');
+        const res = await fetch(`${API_BASE_URL}/election/status`);
+        const json = await res.json();
+        if (res.ok && json.data) {
+          setPollStatus(json.data.is_polls_open ? 'open' : 'closed');
         } else {
           setPollStatus('closed');
         }
@@ -42,7 +42,10 @@ export default function RootLayout({
         setPollStatus('closed');
       }
     };
+
     fetchStatus();
+    const interval = setInterval(fetchStatus, 15000); // Check every 15s
+    return () => clearInterval(interval);
   }, []);
 
   // Close mobile menu on navigation

@@ -68,11 +68,12 @@ export class AdminController {
          FROM voter_ledger`
       );
 
-      // Registration portal status
+      // Registration & Polls status
       const [electionState] = await db.query<RowDataPacket[]>(
-        'SELECT is_registration_open, is_active FROM elections WHERE is_active = TRUE LIMIT 1'
+        'SELECT is_registration_open, is_active FROM elections ORDER BY created_at DESC LIMIT 1'
       );
       const isRegOpen = electionState.length > 0 ? Boolean(electionState[0].is_registration_open) : true;
+      const isPollsOpen = electionState.length > 0 ? Boolean(electionState[0].is_active) : true;
 
       // Positions & Candidates counts
       const [positionStats] = await db.query<RowDataPacket[]>(
@@ -111,6 +112,7 @@ export class AdminController {
             total_candidates: Number(candidateStats[0]?.total_candidates || 0),
             total_votes_recorded: Number(voteStats[0]?.total_votes_recorded || 0),
             is_registration_open: isRegOpen,
+            is_polls_open: isPollsOpen,
           },
           levanter: {
             api_url: config.levanter.apiUrl,
@@ -756,6 +758,38 @@ export class AdminController {
       success: true,
       message: `Active Levanter endpoint updated to "${LevanterService.getActiveEndpoint()}".`,
     });
+  }
+
+  /**
+   * Toggle Election Voting Polls Open/Closed
+   */
+  public static async toggleElectionPolls(req: Request, res: Response): Promise<void> {
+    const { is_open } = req.body;
+    const shouldOpen = typeof is_open === 'boolean' ? is_open : true;
+
+    try {
+      const db = getDbPool();
+      await db.query('UPDATE elections SET is_active = ? ORDER BY created_at DESC LIMIT 1', [shouldOpen]);
+
+      await db.query(
+        'INSERT INTO audit_logs (event_type, description, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+        [
+          'POLLS_STATUS_TOGGLED',
+          `Admin toggled election voting polls to ${shouldOpen ? 'OPEN' : 'CLOSED'}`,
+          req.ip || null,
+          req.headers['user-agent'] || null,
+        ]
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Election voting polls are now ${shouldOpen ? 'OPEN' : 'CLOSED'}.`,
+        data: { is_polls_open: shouldOpen },
+      });
+    } catch (error: any) {
+      console.error('[AdminController.toggleElectionPolls] Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to toggle election polls status.' });
+    }
   }
 
   /**

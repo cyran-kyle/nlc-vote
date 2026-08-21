@@ -40,6 +40,51 @@ interface PositionRow extends RowDataPacket {
 
 export class ElectionController {
   /**
+   * Retrieves high-level election polls and registration status.
+   */
+  public static async getStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const db = getDbPool();
+      const [elections] = await db.query<RowDataPacket[]>(
+        'SELECT id, title, academic_year, is_active, is_registration_open, start_time, end_time FROM elections ORDER BY created_at DESC LIMIT 1'
+      );
+
+      if (elections.length === 0) {
+        res.status(200).json({
+          success: true,
+          data: {
+            is_polls_open: false,
+            is_registration_open: false,
+            election_title: 'NLC General Elections',
+            academic_year: '2026/2027',
+          },
+        });
+        return;
+      }
+
+      const election = elections[0];
+      res.status(200).json({
+        success: true,
+        data: {
+          is_polls_open: Boolean(election.is_active),
+          is_registration_open: Boolean(election.is_registration_open),
+          election_id: election.id,
+          election_title: election.title,
+          academic_year: election.academic_year,
+          start_time: election.start_time,
+          end_time: election.end_time,
+        },
+      });
+    } catch (error: any) {
+      console.error('[ElectionController.getStatus] Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch election status.',
+      });
+    }
+  }
+
+  /**
    * Retrieves active election, open positions, and candidate profiles.
    */
   public static async getBallot(req: Request, res: Response): Promise<void> {
@@ -135,6 +180,19 @@ export class ElectionController {
     try {
       // Execute within an atomic ACID transaction
       const submissionResult = await withTransaction(async (connection) => {
+        // STEP 0: Verify that election polls are currently open
+        const [electionCheck] = await connection.query<RowDataPacket[]>(
+          'SELECT id, is_active FROM elections WHERE id = ?',
+          [election_id]
+        );
+
+        if (electionCheck.length === 0 || !electionCheck[0].is_active) {
+          throw {
+            status: 403,
+            message: 'Voting polls are currently closed. Ballot submission rejected.',
+          };
+        }
+
         // STEP 1: Pessimistic Row Lock on voter_ledger
         // Prevents race conditions and double-voting concurrent requests
         const [voters] = await connection.query<VoterLockRow[]>(

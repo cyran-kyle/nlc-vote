@@ -248,22 +248,28 @@ export default function BallotPage() {
     );
   }
 
-  // Empty State View
+  // Empty / Closed State View
   if (!electionData || !electionData.positions || electionData.positions.length === 0) {
     return (
       <div className="max-w-xl mx-auto py-12 text-center animate-fadeSlideIn">
         <div className="glass-panel rounded-2xl p-8 sm:p-10 border border-[#2a4856] space-y-4">
-          <div className="w-16 h-16 rounded-full bg-[#418ccd]/20 text-[#418ccd] flex items-center justify-center mx-auto border border-[#418ccd]/40">
-            <Inbox className="w-8 h-8" />
+          <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto border border-red-500/40">
+            <Lock className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-white">No Active Ballot Available</h2>
+          <h2 className="text-xl font-bold text-white">Voting Polls are Closed</h2>
           <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-            There are currently no active portfolios or candidates configured for this election. Please contact the Electoral Commission.
+            {errorMessage || 'There is currently no open ballot available for voting. The Electoral Commission has closed or concluded the election polls.'}
           </p>
-          <div className="pt-2">
+          <div className="pt-3 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/results"
+              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#418ccd] to-[#2c6ea6] hover:from-[#5ca3db] hover:to-[#418ccd] text-white text-sm font-bold transition-all shadow-lg shadow-[#418ccd]/20"
+            >
+              <span>View Live Results</span>
+            </Link>
             <Link
               href="/"
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-[#2a4856] hover:bg-[#365b6d] text-white text-sm font-semibold transition-colors"
+              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-[#2a4856] hover:bg-[#365b6d] text-slate-200 text-sm font-semibold transition-colors border border-[#418ccd]/40"
             >
               <span>Return to Home</span>
             </Link>

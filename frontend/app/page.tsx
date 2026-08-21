@@ -32,6 +32,25 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [idValidationError, setIdValidationError] = useState<string | null>(null);
+  const [isPollsOpen, setIsPollsOpen] = useState<boolean | null>(null);
+
+  // Check live election polls status on mount
+  useEffect(() => {
+    const checkPolls = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/election/status`);
+        const json = await res.json();
+        if (res.ok && json.data) {
+          setIsPollsOpen(Boolean(json.data.is_polls_open));
+        } else {
+          setIsPollsOpen(true);
+        }
+      } catch {
+        setIsPollsOpen(true);
+      }
+    };
+    checkPolls();
+  }, []);
 
   // Student details returned from request-otp
   const [studentData, setStudentData] = useState<{
@@ -289,8 +308,39 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* STEP 1: Student ID Entry Form */}
-        {step === 'id_entry' && (
+        {/* Polls Closed Announcement Banner */}
+        {isPollsOpen === false && (
+          <div className="p-6 rounded-2xl bg-red-950/40 border border-red-500/40 text-center space-y-4 animate-fadeSlideIn my-2">
+            <div className="w-14 h-14 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto border border-red-500/30">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-lg sm:text-xl font-bold text-white">Voting Polls are Currently Closed</h2>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                The official voting period is either concluded or currently suspended by the Electoral Commission.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
+              <Link
+                href="/results"
+                className="inline-flex items-center justify-center space-x-2 py-3 px-6 rounded-xl bg-gradient-to-r from-[#418ccd] to-[#2c6ea6] hover:from-[#5ca3db] hover:to-[#418ccd] text-white font-bold text-sm shadow-lg shadow-[#418ccd]/25 transition-all"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>View Live Election Results</span>
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center space-x-2 py-3 px-6 rounded-xl bg-[#2a4856] hover:bg-[#365b6d] text-slate-200 text-sm font-semibold transition-colors border border-[#418ccd]/40"
+              >
+                <UserPlus className="w-4 h-4 text-[#ffb606]" />
+                <span>Voter Registration</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 1: Student ID Entry Form (Only if polls are open) */}
+        {isPollsOpen !== false && step === 'id_entry' && (
           <form onSubmit={handleRequestOtp} className="space-y-6 animate-fadeSlideIn">
             <div>
               <label
