@@ -12,6 +12,7 @@ import {
   Info,
   Lock,
   Clock,
+  CheckCircle2,
 } from 'lucide-react';
 
 const API_BASE_URL =
@@ -51,6 +52,33 @@ export default function RegisterPage() {
     status: string;
   } | null>(null);
 
+  // Per-field validation states
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const fieldErrors: Record<string, string | null> = {
+    fullName: touched.fullName && !fullName.trim() ? 'Full name is required.' : null,
+    studentId: touched.studentId
+      ? !studentId.trim()
+        ? 'Student ID is required.'
+        : !studentId.trim().toUpperCase().startsWith('NLC')
+        ? 'Student ID must start with NLC (e.g. NLC/2026/001).'
+        : studentId.trim().length < 5
+        ? 'Student ID is too short.'
+        : null
+      : null,
+    whatsappNumber: touched.whatsappNumber
+      ? !whatsappNumber.trim()
+        ? 'WhatsApp number is required.'
+        : (() => {
+            const cleaned = cleanPhonePreview(whatsappNumber);
+            if (!cleaned.startsWith('233')) return 'Number must start with 233.';
+            if (cleaned.length !== 12) return 'Must be exactly 12 digits (233XXXXXXXXX).';
+            return null;
+          })()
+      : null,
+  };
+
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+
   // Check registration portal status on mount
   useEffect(() => {
     const fetchStatus = async () => {
@@ -70,17 +98,30 @@ export default function RegisterPage() {
   }, []);
 
   // Format phone helper preview
-  const cleanPhonePreview = (val: string) => {
+  function cleanPhonePreview(val: string) {
     let clean = val.replace(/[^0-9]/g, '');
     if (clean.startsWith('0') && clean.length === 10) {
       clean = '233' + clean.substring(1);
     }
     return clean;
+  }
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    // Touch all fields
+    setTouched({ fullName: true, studentId: true, whatsappNumber: true });
+
+    // Check Student ID starts with NLC
+    if (!studentId.trim().toUpperCase().startsWith('NLC')) {
+      setErrorMessage('Student ID must start with NLC (e.g. NLC/2026/001).');
+      return;
+    }
 
     const formattedPhone = cleanPhonePreview(whatsappNumber);
 
@@ -123,7 +164,7 @@ export default function RegisterPage() {
   return (
     <div className="max-w-xl mx-auto py-4 sm:py-6 space-y-6">
       {/* Header */}
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-2 animate-fadeSlideIn">
         <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-[#ffb606]/15 border border-[#ffb606]/35 text-[#ffb606] text-xs font-bold">
           <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
           <span>Voter Onboarding</span>
@@ -166,7 +207,7 @@ export default function RegisterPage() {
         {errorMessage && (
           <div
             role="alert"
-            className="mb-5 p-4 rounded-xl bg-red-950/60 border border-red-500/40 flex items-start space-x-3 text-red-200 text-sm"
+            className="mb-5 p-4 rounded-xl bg-red-950/60 border border-red-500/40 flex items-start space-x-3 text-red-200 text-sm animate-fadeIn"
           >
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-400" aria-hidden="true" />
             <div className="flex-1 font-medium">{errorMessage}</div>
@@ -175,7 +216,7 @@ export default function RegisterPage() {
 
         {/* Success View */}
         {registeredStudent ? (
-          <div className="space-y-5 text-center">
+          <div className="space-y-5 text-center animate-fadeSlideIn">
             <div className="w-14 h-14 rounded-full bg-[#418ccd]/20 text-[#418ccd] flex items-center justify-center mx-auto border border-[#418ccd]/40">
               <Clock className="w-8 h-8 stroke-[2.5]" aria-hidden="true" />
             </div>
@@ -230,7 +271,7 @@ export default function RegisterPage() {
         ) : (
           /* Registration Form */
           isRegistrationOpen && (
-            <form onSubmit={handleRegister} className="space-y-4 sm:space-y-5">
+            <form onSubmit={handleRegister} className="space-y-4 sm:space-y-5 animate-fadeSlideIn">
               {/* Full Name */}
               <div>
                 <label htmlFor="full_name" className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
@@ -242,9 +283,18 @@ export default function RegisterPage() {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  onBlur={() => handleBlur('fullName')}
                   placeholder="e.g. Samuel Kwaku Boakye"
-                  className="w-full px-4 py-3 bg-[#0e1e2e] border border-[#2a4856] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#418ccd] text-sm font-medium transition-colors min-h-[48px]"
+                  className={`w-full px-4 py-3 bg-[#0e1e2e] border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#418ccd] text-sm font-medium transition-colors min-h-[48px] ${
+                    fieldErrors.fullName ? 'border-red-500/60' : 'border-[#2a4856]'
+                  }`}
                 />
+                {fieldErrors.fullName && (
+                  <p className="mt-1.5 text-xs text-red-400 flex items-center space-x-1">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>{fieldErrors.fullName}</span>
+                  </p>
+                )}
               </div>
 
               {/* Student ID */}
@@ -258,9 +308,23 @@ export default function RegisterPage() {
                   required
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value.toUpperCase())}
+                  onBlur={() => handleBlur('studentId')}
                   placeholder="e.g. NLC/2026/089"
-                  className="w-full px-4 py-3 bg-[#0e1e2e] border border-[#2a4856] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#418ccd] text-sm font-mono uppercase font-bold tracking-wider transition-colors min-h-[48px]"
+                  className={`w-full px-4 py-3 bg-[#0e1e2e] border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#418ccd] text-sm font-mono uppercase font-bold tracking-wider transition-colors min-h-[48px] ${
+                    fieldErrors.studentId ? 'border-red-500/60' : 'border-[#2a4856]'
+                  }`}
                 />
+                {fieldErrors.studentId ? (
+                  <p className="mt-1.5 text-xs text-red-400 flex items-center space-x-1">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>{fieldErrors.studentId}</span>
+                  </p>
+                ) : touched.studentId && !fieldErrors.studentId && studentId.trim() ? (
+                  <p className="mt-1.5 text-xs text-[#5ebb3e] flex items-center space-x-1">
+                    <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                    <span>Valid format</span>
+                  </p>
+                ) : null}
               </div>
 
               {/* Department & Level */}
@@ -322,19 +386,27 @@ export default function RegisterPage() {
                     required
                     value={whatsappNumber}
                     onChange={(e) => setWhatsappNumber(e.target.value)}
+                    onBlur={() => handleBlur('whatsappNumber')}
                     placeholder="e.g. 233540001122"
-                    className="w-full pl-11 pr-4 py-3 bg-[#0e1e2e] border border-[#2a4856] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#5ebb3e] text-sm font-mono font-bold tracking-wider transition-colors min-h-[48px]"
+                    className={`w-full pl-11 pr-4 py-3 bg-[#0e1e2e] border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#5ebb3e] text-sm font-mono font-bold tracking-wider transition-colors min-h-[48px] ${
+                      fieldErrors.whatsappNumber ? 'border-red-500/60' : 'border-[#2a4856]'
+                    }`}
                   />
                 </div>
 
-                {whatsappNumber && (
+                {fieldErrors.whatsappNumber ? (
+                  <p className="mt-1.5 text-xs text-red-400 flex items-center space-x-1">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>{fieldErrors.whatsappNumber}</span>
+                  </p>
+                ) : whatsappNumber ? (
                   <div className="mt-2 text-xs text-slate-300 flex items-center space-x-1.5">
                     <span>Formatted number:</span>
                     <span className="font-mono text-[#5ebb3e] font-bold">
                       +{cleanPhonePreview(whatsappNumber)}
                     </span>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {/* Submit Button */}
@@ -342,7 +414,7 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#5ebb3e] to-[#418ccd] hover:from-[#6ed349] hover:to-[#5ca3db] text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-lg shadow-[#5ebb3e]/25 disabled:opacity-50 transition-all transform active:scale-98 min-h-[48px] focus-visible:ring-2 focus-visible:ring-[#ffb606]"
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#5ebb3e] to-[#418ccd] hover:from-[#6ed349] hover:to-[#5ca3db] text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-lg shadow-[#5ebb3e]/25 disabled:opacity-50 transition-all transform active:scale-[0.98] min-h-[48px] focus-visible:ring-2 focus-visible:ring-[#ffb606]"
                 >
                   {loading ? (
                     <>

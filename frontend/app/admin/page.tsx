@@ -30,6 +30,8 @@ import {
   ToggleLeft,
   ToggleRight,
   ChevronRight,
+  Camera,
+  User,
 } from 'lucide-react';
 
 const API_BASE_URL =
@@ -143,6 +145,10 @@ export default function AdminPage() {
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('');
   const [testingWhatsApp, setTestingWhatsApp] = useState(false);
+
+  // Candidate Photo Upload State
+  const [uploadingCandidateId, setUploadingCandidateId] = useState<string | null>(null);
+  const [newCandidatePhoto, setNewCandidatePhoto] = useState<File | null>(null);
 
   // File Upload Ref
   const voterFileInputRef = useRef<HTMLInputElement>(null);
@@ -580,6 +586,17 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
+
+      // If a candidate photo was selected, upload it immediately
+      if (newCandidatePhoto && data.data?.id) {
+        const photoFormData = new FormData();
+        photoFormData.append('photo', newCandidatePhoto);
+        await authFetch(`/admin/candidates/${data.data.id}/photo`, {
+          method: 'POST',
+          body: photoFormData,
+        });
+      }
+
       showAlert('success', data.message);
       setShowAddCandidateModal(false);
       setNewCandidate({
@@ -588,10 +605,33 @@ export default function AdminPage() {
         tagline: '',
         manifesto: '',
       });
+      setNewCandidatePhoto(null);
       loadPositions();
       loadStats();
     } catch (err: any) {
       showAlert('error', err.message);
+    }
+  };
+
+  // Upload Candidate Photo Directly
+  const handleCandidatePhotoUpload = async (candidateId: string, file: File) => {
+    if (!file) return;
+    setUploadingCandidateId(candidateId);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await authFetch(`/admin/candidates/${candidateId}/photo`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to upload photo');
+      showAlert('success', 'Candidate photo updated successfully.');
+      loadPositions();
+    } catch (err: any) {
+      showAlert('error', err.message || 'Failed to upload candidate photo.');
+    } finally {
+      setUploadingCandidateId(null);
     }
   };
 
@@ -1321,29 +1361,96 @@ export default function AdminPage() {
 
                 {/* Candidate Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {pos.candidates.map((cand) => (
-                    <div
-                      key={cand.id}
-                      className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start justify-between gap-3"
-                    >
-                      <div>
-                        <h4 className="text-sm font-bold text-white">{cand.full_name}</h4>
-                        {cand.running_mate && (
-                          <div className="text-xs text-cyan-400">Vice: {cand.running_mate}</div>
-                        )}
-                        {cand.tagline && (
-                          <div className="text-xs italic text-slate-400 mt-1 line-clamp-1">"{cand.tagline}"</div>
-                        )}
-                      </div>
+                  {pos.candidates.map((cand) => {
+                    const avatarUrl = cand.avatar_url
+                      ? cand.avatar_url.startsWith('http')
+                        ? cand.avatar_url
+                        : `${API_BASE_URL.replace('/api', '')}${cand.avatar_url}`
+                      : null;
 
-                      <button
-                        onClick={() => handleDeleteCandidate(cand.id)}
-                        className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                    return (
+                      <div
+                        key={cand.id}
+                        className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start justify-between gap-3"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-start space-x-3.5 min-w-0">
+                          {/* Candidate Photo / Upload Avatar Section */}
+                          <div className="relative group w-14 h-14 rounded-xl bg-slate-950 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={cand.full_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <User className="w-6 h-6 text-slate-500" />
+                            )}
+
+                            {/* Hover / Click Photo Upload Overlay */}
+                            <label
+                              className={`absolute inset-0 bg-black/70 flex flex-col items-center justify-center cursor-pointer transition-opacity text-[10px] text-cyan-300 font-semibold p-1 ${
+                                uploadingCandidateId === cand.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              }`}
+                              title="Upload / Change Photo"
+                            >
+                              {uploadingCandidateId === cand.id ? (
+                                <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                              ) : (
+                                <>
+                                  <Camera className="w-3.5 h-3.5 mb-0.5" />
+                                  <span>{cand.avatar_url ? 'Change' : 'Upload'}</span>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={uploadingCandidateId === cand.id}
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleCandidatePhotoUpload(cand.id, f);
+                                }}
+                              />
+                            </label>
+                          </div>
+
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-white truncate">{cand.full_name}</h4>
+                            {cand.running_mate && (
+                              <div className="text-xs text-cyan-400 truncate">Vice: {cand.running_mate}</div>
+                            )}
+                            {cand.tagline && (
+                              <div className="text-xs italic text-slate-400 mt-1 line-clamp-1">"{cand.tagline}"</div>
+                            )}
+                            <div className="mt-1.5 flex items-center space-x-2">
+                              <label className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-medium flex items-center space-x-1 underline">
+                                <Camera className="w-3 h-3" />
+                                <span>{cand.avatar_url ? 'Update Photo' : 'Add Photo'}</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  disabled={uploadingCandidateId === cand.id}
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleCandidatePhotoUpload(cand.id, f);
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteCandidate(cand.id)}
+                          className="p-1 text-slate-500 hover:text-red-400 transition-colors flex-shrink-0"
+                          title="Delete Candidate"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -1643,6 +1750,32 @@ export default function AdminPage() {
                   placeholder="Key campaign promises..."
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
                 />
+              </div>
+
+              {/* Optional Photo Attachment */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Candidate Photo (Optional)</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setNewCandidatePhoto(e.target.files?.[0] || null)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-cyan-500/20 file:text-cyan-300 hover:file:bg-cyan-500/30"
+                  />
+                  {newCandidatePhoto && (
+                    <button
+                      type="button"
+                      onClick={() => setNewCandidatePhoto(null)}
+                      className="p-1 text-slate-400 hover:text-red-400 text-xs"
+                      title="Remove selected photo"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  You can also upload or change the photo anytime after adding the nominee.
+                </p>
               </div>
 
               <div className="flex justify-end space-x-2 pt-2">

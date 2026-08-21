@@ -98,10 +98,10 @@ export default function SuccessPage() {
   });
 
   return (
-    <div className="max-w-2xl mx-auto py-6 sm:py-8 space-y-6">
+    <div className="max-w-2xl mx-auto py-6 sm:py-8 space-y-6 animate-fadeSlideIn">
       {/* Top Banner */}
       <div className="text-center space-y-2">
-        <div className="inline-flex p-3 rounded-full bg-[#5ebb3e]/20 text-[#5ebb3e] mb-2 border border-[#5ebb3e]/40">
+        <div className="inline-flex p-3 rounded-full bg-[#5ebb3e]/20 text-[#5ebb3e] mb-2 border border-[#5ebb3e]/40 shadow-lg shadow-[#5ebb3e]/10">
           <CheckCircle2 className="w-12 h-12" aria-hidden="true" />
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -129,11 +129,11 @@ export default function SuccessPage() {
 
       {/* Official Printable Digital Voting Certificate with NLC Theme */}
       <div className="glass-panel print-area rounded-2xl p-6 sm:p-8 border border-[#2a4856] shadow-2xl relative overflow-hidden space-y-6">
-        {/* Certificate Header */}
+        {/* Certificate Header with Official Logo */}
         <div className="flex items-center justify-between pb-6 border-b border-[#2a4856]">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-[#418ccd]/20 text-[#418ccd] flex items-center justify-center flex-shrink-0">
-              <ShieldCheck className="w-6 h-6" aria-hidden="true" />
+          <div className="flex items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#2a4856] shadow-md flex-shrink-0">
+              <img src="/nlc-logo.png" alt="New Life College" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-widest text-[#ffb606]">

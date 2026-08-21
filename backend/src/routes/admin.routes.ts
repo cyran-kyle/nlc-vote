@@ -31,6 +31,7 @@ router.get('/nominees', AdminController.getNominees);
 router.post('/positions', AdminController.createPosition);
 router.delete('/positions/:id', AdminController.deletePosition);
 router.post('/candidates', AdminController.createCandidate);
+router.post('/candidates/:id/photo', upload.single('photo'), AdminController.uploadCandidatePhoto);
 router.delete('/candidates/:id', AdminController.deleteCandidate);
 router.post('/nominees/import', upload.single('file'), AdminController.bulkImportNominees);
 

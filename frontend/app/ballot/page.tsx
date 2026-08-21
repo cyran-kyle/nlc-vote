@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Vote,
   CheckCircle2,
@@ -15,10 +16,13 @@ import {
   RefreshCw,
   X,
   AlertTriangle,
+  Inbox,
 } from 'lucide-react';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+const SERVER_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
 interface Candidate {
   id: string;
@@ -73,6 +77,14 @@ export default function BallotPage() {
 
   // Review & Confirmation Modal
   const [showReviewModal, setShowReviewModal] = useState(false);
+
+  // Candidate avatar url helper
+  const getFullAvatarUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return `${SERVER_BASE_URL}${url}`;
+    return `${SERVER_BASE_URL}/${url}`;
+  };
 
   // Fetch Ballot Details
   const fetchBallot = useCallback(async () => {
@@ -197,13 +209,66 @@ export default function BallotPage() {
     }
   };
 
+  // Loading Skeleton View
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4" role="status">
-        <RefreshCw className="w-10 h-10 text-[#418ccd] animate-spin" aria-hidden="true" />
-        <p className="text-slate-200 font-medium tracking-wide">
-          Loading Official Digital Ballot...
-        </p>
+      <div className="max-w-4xl mx-auto py-4 space-y-8 animate-fadeIn">
+        {/* Header Skeleton */}
+        <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-[#2a4856] space-y-4">
+          <div className="skeleton skeleton-title w-48" />
+          <div className="skeleton skeleton-text w-72" />
+          <div className="skeleton h-3 w-full rounded-full mt-4" />
+        </div>
+
+        {/* Position Skeletons */}
+        {[1, 2].map((idx) => (
+          <div key={idx} className="glass-panel rounded-2xl p-6 sm:p-8 border border-[#2a4856] space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#2a4856]">
+              <div className="skeleton skeleton-title w-56" />
+              <div className="skeleton w-28 h-6 rounded-full" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2].map((cIdx) => (
+                <div key={cIdx} className="p-5 rounded-xl bg-[#16283b]/60 border border-[#2a4856] space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="skeleton skeleton-avatar" />
+                    <div className="space-y-2 flex-1">
+                      <div className="skeleton skeleton-title w-32" />
+                      <div className="skeleton skeleton-text w-24" />
+                    </div>
+                  </div>
+                  <div className="skeleton skeleton-text w-full" />
+                  <div className="skeleton skeleton-text w-3/4" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Empty State View
+  if (!electionData || !electionData.positions || electionData.positions.length === 0) {
+    return (
+      <div className="max-w-xl mx-auto py-12 text-center animate-fadeSlideIn">
+        <div className="glass-panel rounded-2xl p-8 sm:p-10 border border-[#2a4856] space-y-4">
+          <div className="w-16 h-16 rounded-full bg-[#418ccd]/20 text-[#418ccd] flex items-center justify-center mx-auto border border-[#418ccd]/40">
+            <Inbox className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-white">No Active Ballot Available</h2>
+          <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+            There are currently no active portfolios or candidates configured for this election. Please contact the Electoral Commission.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-[#2a4856] hover:bg-[#365b6d] text-white text-sm font-semibold transition-colors"
+            >
+              <span>Return to Home</span>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -211,7 +276,7 @@ export default function BallotPage() {
   return (
     <div className="max-w-4xl mx-auto py-4 space-y-8">
       {/* Top Accredited Voter & Election Info Header */}
-      <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-[#2a4856] shadow-xl relative overflow-hidden">
+      <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-[#2a4856] shadow-xl relative overflow-hidden animate-fadeSlideIn">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#418ccd] via-[#ffb606] to-[#5ebb3e]" aria-hidden="true" />
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -265,7 +330,7 @@ export default function BallotPage() {
       {errorMessage && (
         <div
           role="alert"
-          className="p-4 rounded-xl bg-red-950/60 border border-red-500/40 flex items-start space-x-3 text-red-200 text-sm font-medium"
+          className="p-4 rounded-xl bg-red-950/60 border border-red-500/40 flex items-start space-x-3 text-red-200 text-sm font-medium animate-fadeIn"
         >
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-400" aria-hidden="true" />
           <div className="flex-1">{errorMessage}</div>
@@ -282,7 +347,7 @@ export default function BallotPage() {
             <section
               key={position.id}
               aria-labelledby={`position-title-${position.id}`}
-              className={`rounded-2xl p-6 sm:p-8 transition-colors border ${
+              className={`rounded-2xl p-6 sm:p-8 transition-colors border animate-fadeSlideIn ${
                 isPositionCompleted
                   ? 'glass-panel border-[#418ccd]/60'
                   : 'glass-panel-subtle border-[#2a4856]'
@@ -328,6 +393,7 @@ export default function BallotPage() {
               >
                 {position.candidates.map((candidate) => {
                   const isSelected = selectedCandidateId === candidate.id;
+                  const avatarSrc = getFullAvatarUrl(candidate.avatar_url);
 
                   return (
                     <div
@@ -351,14 +417,27 @@ export default function BallotPage() {
                       {/* Candidate Info Header */}
                       <div className="flex items-start justify-between gap-3 mb-4">
                         <div className="flex items-center space-x-3.5">
+                          {/* Candidate Avatar with Image fallback */}
                           <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-base transition-colors ${
+                            className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-base overflow-hidden border flex-shrink-0 transition-colors ${
                               isSelected
-                                ? 'bg-[#418ccd] text-white shadow-md shadow-[#418ccd]/30'
-                                : 'bg-[#0e1e2e] text-slate-300'
+                                ? 'border-[#418ccd] bg-[#418ccd] text-white shadow-md shadow-[#418ccd]/30'
+                                : 'border-[#2a4856] bg-[#0e1e2e] text-slate-300'
                             }`}
                           >
-                            <User className="w-6 h-6" aria-hidden="true" />
+                            {avatarSrc ? (
+                              <img
+                                src={avatarSrc}
+                                alt={candidate.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to icon on error
+                                  (e.currentTarget as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <User className="w-7 h-7" aria-hidden="true" />
+                            )}
                           </div>
 
                           <div>
@@ -459,7 +538,7 @@ export default function BallotPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="manifesto-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
         >
           <div className="glass-panel max-w-lg w-full rounded-2xl p-6 sm:p-8 border border-[#2a4856] shadow-2xl relative max-h-[85vh] flex flex-col">
             <button
@@ -470,9 +549,17 @@ export default function BallotPage() {
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
 
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-[#418ccd]/20 text-[#418ccd] flex items-center justify-center font-bold">
-                <User className="w-6 h-6" aria-hidden="true" />
+            <div className="flex items-center space-x-3.5 mb-4">
+              <div className="w-14 h-14 rounded-xl bg-[#418ccd]/20 text-[#418ccd] flex items-center justify-center font-bold overflow-hidden border border-[#2a4856] flex-shrink-0">
+                {activeManifestoCandidate.avatar_url ? (
+                  <img
+                    src={getFullAvatarUrl(activeManifestoCandidate.avatar_url) || ''}
+                    alt={activeManifestoCandidate.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="w-7 h-7" aria-hidden="true" />
+                )}
               </div>
               <div>
                 <h3 id="manifesto-modal-title" className="text-lg font-bold text-white">
@@ -496,7 +583,13 @@ export default function BallotPage() {
               <h4 className="text-xs font-bold uppercase tracking-wider text-[#418ccd]">
                 Official Candidate Manifesto
               </h4>
-              <p>{activeManifestoCandidate.manifesto || 'No manifesto text has been submitted for this candidate.'}</p>
+              {activeManifestoCandidate.manifesto ? (
+                activeManifestoCandidate.manifesto.split('\n').filter(Boolean).map((paragraph, pIdx) => (
+                  <p key={pIdx} className="text-slate-300">{paragraph}</p>
+                ))
+              ) : (
+                <p className="text-slate-400 italic">No manifesto text has been submitted for this candidate.</p>
+              )}
             </div>
 
             <div className="mt-6 pt-4 border-t border-[#2a4856] flex justify-end">
@@ -518,7 +611,7 @@ export default function BallotPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="review-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
         >
           <div className="glass-panel max-w-xl w-full rounded-2xl p-6 sm:p-8 border border-[#2a4856] shadow-2xl relative max-h-[90vh] flex flex-col">
             <div className="flex items-center space-x-3 mb-4">
@@ -543,31 +636,44 @@ export default function BallotPage() {
               </div>
             </div>
 
-            {/* Selected Candidates Summary List */}
+            {/* Selected Candidates Summary List with Position Numbers & Thumbnails */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 py-2">
-              {electionData.positions.map((pos) => {
+              {electionData.positions.map((pos, pIdx) => {
                 const selectedCandId = selections[pos.id];
                 const candidate = pos.candidates.find((c) => c.id === selectedCandId);
+                const avatarSrc = getFullAvatarUrl(candidate?.avatar_url || null);
 
                 return (
                   <div
                     key={pos.id}
-                    className="p-3.5 rounded-xl bg-[#0e1e2e] border border-[#2a4856] flex items-center justify-between"
+                    className="p-3.5 rounded-xl bg-[#0e1e2e] border border-[#2a4856] flex items-center justify-between gap-3"
                   >
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        {pos.title}
+                    <div className="flex items-center space-x-3">
+                      <span className="w-6 h-6 rounded-full bg-[#418ccd]/20 text-[#418ccd] text-[11px] font-bold flex items-center justify-center font-mono flex-shrink-0">
+                        {pIdx + 1}
+                      </span>
+                      <div className="w-9 h-9 rounded-lg bg-[#16283b] overflow-hidden flex items-center justify-center border border-[#2a4856] flex-shrink-0">
+                        {avatarSrc ? (
+                          <img src={avatarSrc} alt={candidate?.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-slate-400" />
+                        )}
                       </div>
-                      <div className="text-sm font-bold text-white">
-                        {candidate?.name || 'No selection'}
-                      </div>
-                      {candidate?.running_mate && (
-                        <div className="text-xs text-[#ffb606]">
-                          Vice: {candidate.running_mate}
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                          {pos.title}
                         </div>
-                      )}
+                        <div className="text-sm font-bold text-white">
+                          {candidate?.name || 'No selection'}
+                        </div>
+                        {candidate?.running_mate && (
+                          <div className="text-xs text-[#ffb606]">
+                            Vice: {candidate.running_mate}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <CheckCircle2 className="w-5 h-5 text-[#5ebb3e]" aria-hidden="true" />
+                    <CheckCircle2 className="w-5 h-5 text-[#5ebb3e] flex-shrink-0" aria-hidden="true" />
                   </div>
                 );
               })}

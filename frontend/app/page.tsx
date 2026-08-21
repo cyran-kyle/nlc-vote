@@ -15,6 +15,8 @@ import {
   Smartphone,
   UserPlus,
   Vote,
+  ShieldCheck,
+  BarChart3,
 } from 'lucide-react';
 
 const API_BASE_URL =
@@ -29,6 +31,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [idValidationError, setIdValidationError] = useState<string | null>(null);
 
   // Student details returned from request-otp
   const [studentData, setStudentData] = useState<{
@@ -69,17 +72,36 @@ export default function LoginPage() {
     return () => clearInterval(cooldownTimer);
   }, [resendCooldown]);
 
+  // Validate Student ID format (must start with NLC)
+  const validateStudentId = (value: string): string | null => {
+    const trimmed = value.trim().toUpperCase();
+    if (!trimmed) return 'Please enter your official Student ID.';
+    if (!trimmed.startsWith('NLC')) return 'Student ID must start with NLC (e.g. NLC/2026/001).';
+    if (trimmed.length < 5) return 'Student ID is too short.';
+    return null;
+  };
+
+  const handleStudentIdBlur = () => {
+    if (studentId.trim()) {
+      setIdValidationError(validateStudentId(studentId));
+    }
+  };
+
   // Request OTP from Backend
   const handleRequestOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!studentId.trim()) {
-      setErrorMessage('Please enter your official Student ID.');
+
+    const validationErr = validateStudentId(studentId);
+    if (validationErr) {
+      setIdValidationError(validationErr);
+      setErrorMessage(validationErr);
       return;
     }
 
     setLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIdValidationError(null);
 
     try {
       const res = await fetch(`${API_BASE_URL}/auth/request-otp`, {
@@ -199,10 +221,19 @@ export default function LoginPage() {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  // Timer urgency: red + pulse when < 60s
+  const timerUrgent = countdown < 60 && countdown > 0;
+  const timerExpired = countdown === 0;
+
   return (
     <div className="max-w-xl mx-auto py-6 sm:py-8 space-y-6">
-      {/* Hero Welcome & Accreditation */}
-      <div className="text-center space-y-3">
+      {/* Hero Welcome Banner */}
+      <div className="text-center space-y-4 animate-fadeSlideIn">
+        <div className="flex justify-center">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-[#418ccd]/40 shadow-xl shadow-[#418ccd]/20">
+            <img src="/nlc-logo.png" alt="New Life College" className="w-full h-full object-cover" />
+          </div>
+        </div>
         <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-[#ffb606]/15 border border-[#ffb606]/35 text-[#ffb606] text-xs font-bold">
           <Vote className="w-3.5 h-3.5" aria-hidden="true" />
           <span>SRC General Elections 2026/2027</span>
@@ -213,6 +244,22 @@ export default function LoginPage() {
         <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
           Enter your official Student ID to receive a verification OTP on your registered WhatsApp number.
         </p>
+
+        {/* Quick Info Badges */}
+        <div className="flex flex-wrap justify-center gap-3 pt-1">
+          <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+            <Lock className="w-3 h-3 text-[#418ccd]" aria-hidden="true" />
+            <span>Secret Ballot</span>
+          </div>
+          <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+            <ShieldCheck className="w-3 h-3 text-[#5ebb3e]" aria-hidden="true" />
+            <span>Tamper-Proof</span>
+          </div>
+          <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+            <BarChart3 className="w-3 h-3 text-[#ffb606]" aria-hidden="true" />
+            <span>Instant Results</span>
+          </div>
+        </div>
       </div>
 
       {/* Main Authentication Card with NLC Theme */}
@@ -224,7 +271,7 @@ export default function LoginPage() {
         {errorMessage && (
           <div
             role="alert"
-            className="mb-6 p-4 rounded-xl bg-red-950/60 border border-red-500/40 flex items-start space-x-3 text-red-200 text-sm"
+            className="mb-6 p-4 rounded-xl bg-red-950/60 border border-red-500/40 flex items-start space-x-3 text-red-200 text-sm animate-fadeIn"
           >
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-400" aria-hidden="true" />
             <div className="flex-1 font-medium">{errorMessage}</div>
@@ -235,7 +282,7 @@ export default function LoginPage() {
         {successMessage && step === 'otp_entry' && (
           <div
             role="alert"
-            className="mb-6 p-4 rounded-xl bg-[#5ebb3e]/15 border border-[#5ebb3e]/40 flex items-start space-x-3 text-emerald-200 text-sm"
+            className="mb-6 p-4 rounded-xl bg-[#5ebb3e]/15 border border-[#5ebb3e]/40 flex items-start space-x-3 text-emerald-200 text-sm animate-fadeIn"
           >
             <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-[#5ebb3e]" aria-hidden="true" />
             <div className="flex-1 font-medium">{successMessage}</div>
@@ -244,7 +291,7 @@ export default function LoginPage() {
 
         {/* STEP 1: Student ID Entry Form */}
         {step === 'id_entry' && (
-          <form onSubmit={handleRequestOtp} className="space-y-6">
+          <form onSubmit={handleRequestOtp} className="space-y-6 animate-fadeSlideIn">
             <div>
               <label
                 htmlFor="student_id"
@@ -260,16 +307,30 @@ export default function LoginPage() {
                   id="student_id"
                   type="text"
                   value={studentId}
-                  onChange={(e) => setStudentId(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setStudentId(e.target.value.toUpperCase());
+                    if (idValidationError) setIdValidationError(null);
+                  }}
+                  onBlur={handleStudentIdBlur}
                   placeholder="e.g. NLC/2026/001"
-                  className="w-full pl-11 pr-4 py-3 bg-[#0e1e2e]/90 border border-[#2a4856] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#418ccd] focus:border-[#418ccd] font-medium tracking-wide transition-colors uppercase text-sm sm:text-base min-h-[48px]"
+                  className={`w-full pl-11 pr-4 py-3 bg-[#0e1e2e]/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#418ccd] focus:border-[#418ccd] font-medium tracking-wide transition-colors uppercase text-sm sm:text-base min-h-[48px] ${
+                    idValidationError ? 'border-red-500/60' : 'border-[#2a4856]'
+                  }`}
                   required
                   autoFocus
                 />
               </div>
-              <p className="mt-2 text-xs text-slate-300">
-                Your one-time password (OTP) will be dispatched to your registered WhatsApp phone number.
-              </p>
+              {/* Inline Validation Hint */}
+              {idValidationError ? (
+                <p className="mt-2 text-xs text-red-400 flex items-center space-x-1">
+                  <AlertCircle className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+                  <span>{idValidationError}</span>
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-300">
+                  Your one-time password (OTP) will be dispatched to your registered WhatsApp phone number.
+                </p>
+              )}
             </div>
 
             <button
@@ -308,7 +369,7 @@ export default function LoginPage() {
 
         {/* STEP 2: WhatsApp OTP Verification Form */}
         {step === 'otp_entry' && (
-          <form onSubmit={handleVerifyOtp} className="space-y-6">
+          <form onSubmit={handleVerifyOtp} className="space-y-6 animate-slideInRight">
             {/* Student Profile Card */}
             {studentData && (
               <div className="p-4 rounded-xl bg-[#0e1e2e]/95 border border-[#2a4856] flex items-center space-x-3.5">
@@ -334,11 +395,13 @@ export default function LoginPage() {
                   Enter 6-Digit WhatsApp OTP
                 </label>
                 <div
-                  className="flex items-center space-x-1.5 text-xs text-[#ffb606] font-semibold"
+                  className={`flex items-center space-x-1.5 text-xs font-semibold transition-colors ${
+                    timerExpired ? 'text-red-400' : timerUrgent ? 'text-red-400 animate-pulse' : 'text-[#ffb606]'
+                  }`}
                   aria-live="polite"
                 >
                   <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Expires in {formatTime(countdown)}</span>
+                  <span>{timerExpired ? 'OTP Expired' : `Expires in ${formatTime(countdown)}`}</span>
                 </div>
               </div>
 

@@ -3,6 +3,8 @@ import { RowDataPacket } from 'mysql2';
 import jwt from 'jsonwebtoken';
 import * as XLSX from 'xlsx';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import { getDbPool } from '../config/db';
 import { config } from '../config/env';
 import { LevanterService } from '../services/levanter';
@@ -521,6 +523,65 @@ export class AdminController {
       res.status(200).json({ success: true, message: 'Candidate deleted.' });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to delete candidate.' });
+    }
+  }
+
+  /**
+   * Upload candidate photo
+   */
+  public static async uploadCandidatePhoto(req: Request, res: Response): Promise<void> {
+    const { id } = req.params;
+    const uploadedFile = (req as any).file;
+
+    if (!uploadedFile) {
+      res.status(400).json({ success: false, message: 'No photo file provided.' });
+      return;
+    }
+
+    try {
+      const db = getDbPool();
+
+      // Verify candidate exists
+      const [existing] = await db.query<RowDataPacket[]>('SELECT id, avatar_url FROM candidates WHERE id = ?', [id]);
+      if (existing.length === 0) {
+        res.status(404).json({ success: false, message: 'Candidate not found.' });
+        return;
+      }
+
+      // Ensure uploads directory exists
+      const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'candidates');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Delete old photo if exists
+      const oldUrl = existing[0].avatar_url;
+      if (oldUrl) {
+        const oldFilePath = path.join(__dirname, '..', '..', oldUrl.replace(/^\//, ''));
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      }
+
+      // Save new photo
+      const ext = path.extname(uploadedFile.originalname) || '.jpg';
+      const filename = `${id}_${Date.now()}${ext}`;
+      const filePath = path.join(uploadsDir, filename);
+      fs.writeFileSync(filePath, uploadedFile.buffer);
+
+      // Public URL path (served by express.static)
+      const avatarUrl = `/uploads/candidates/${filename}`;
+
+      await db.query('UPDATE candidates SET avatar_url = ? WHERE id = ?', [avatarUrl, id]);
+
+      res.status(200).json({
+        success: true,
+        message: 'Candidate photo uploaded successfully.',
+        data: { avatar_url: avatarUrl },
+      });
+    } catch (error: any) {
+      console.error('[AdminController.uploadCandidatePhoto] Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to upload candidate photo.' });
     }
   }
 
