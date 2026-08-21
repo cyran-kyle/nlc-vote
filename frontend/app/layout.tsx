@@ -109,11 +109,11 @@ export default function RootLayout({
               className="flex items-center space-x-3 group min-w-0 rounded-xl focus-visible:ring-2 focus-visible:ring-[#418ccd]"
               aria-label="New Life College SRC Voting Portal Home"
             >
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden shadow-md shadow-[#418ccd]/20 group-hover:scale-105 transition-transform duration-200 flex-shrink-0 border border-[#2a4856]">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden shadow-md shadow-[#418ccd]/20 group-hover:scale-105 transition-transform duration-200 flex-shrink-0 border border-[#2a4856] bg-white flex items-center justify-center p-1">
                 <img
                   src="/nlc-logo.png"
                   alt="New Life College Logo"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain object-center"
                 />
               </div>
               <div className="min-w-0">

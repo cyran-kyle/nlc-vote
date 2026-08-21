@@ -132,8 +132,8 @@ export default function SuccessPage() {
         {/* Certificate Header with Official Logo */}
         <div className="flex items-center justify-between pb-6 border-b border-[#2a4856]">
           <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#2a4856] shadow-md flex-shrink-0">
-              <img src="/nlc-logo.png" alt="New Life College" className="w-full h-full object-cover" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#2a4856] shadow-md flex-shrink-0 bg-white flex items-center justify-center p-1">
+              <img src="/nlc-logo.png" alt="New Life College" className="w-full h-full object-contain object-center" />
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-widest text-[#ffb606]">

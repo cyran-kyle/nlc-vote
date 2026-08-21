@@ -124,14 +124,46 @@ docker compose up --build
 
 ---
 
-## 👥 Pre-Seeded Test Voter Accounts
+## 🌐 Exposing Docker on Local Wi-Fi Network (Campus / Multi-Device Access)
 
-| Student ID | Student Name | Department | Academic Level | Registered Phone (Ghana) |
-|---|---|---|---|---|
-| `NLC/2024/001` | Samuel Kwaku Boakye | Computer Science | Level 300 | `233540001122` |
-| `NLC/2024/002` | Akua Afriyie Osei | Business Administration | Level 200 | `233550002233` |
-| `NLC/2024/003` | Kwame Derrick Ansah | Nursing & Midwifery | Level 400 | `233240003344` |
-| `NLC/2024/004` | Blessing Mawusi Dogbe | Information Technology | Level 100 | `233270004455` |
+You can allow students and election officials on the same Wi-Fi network to access the voting portal from their smartphones, tablets, or laptops:
+
+### Step 1: Find Your Computer's Local Wi-Fi IP
+Open PowerShell or Command Prompt on the host machine:
+```powershell
+ipconfig
+```
+Look for **IPv4 Address** under your Wireless LAN adapter (e.g. `192.168.100.8`).
+
+### Step 2: Configure Environment Variables
+Update the root [`.env`](.env) and [`backend/.env`](backend/.env) files with your machine's Wi-Fi IP:
+```env
+CLIENT_URL=http://192.168.100.8:3000
+NEXT_PUBLIC_API_URL=http://192.168.100.8:5000/api
+```
+*(Replace `192.168.100.8` with your actual local IP).*
+
+### Step 3: Allow Inbound Ports in Windows Defender Firewall
+Open **PowerShell as Administrator** and run:
+```powershell
+New-NetFirewallRule -DisplayName "NLC Voting Frontend (3000)" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "NLC Voting Backend (5000)" -Direction Inbound -LocalPort 5000 -Protocol TCP -Action Allow
+```
+
+### Step 4: Rebuild and Start Containers
+Next.js bakes `NEXT_PUBLIC_API_URL` during build. Rebuild the cluster:
+```bash
+docker compose down
+docker compose up --build -d
+```
+
+### Step 5: Connect from Any Device on the Wi-Fi
+| Interface | Wi-Fi Device Access URL |
+|---|---|
+| **🗳️ Voter Authentication & Ballot** | `http://192.168.100.8:3000` |
+| **📝 Student Self-Registration** | `http://192.168.100.8:3000/register` |
+| **📊 Live Election Results** | `http://192.168.100.8:3000/results` |
+| **🔒 Electoral Commission Admin** | `http://192.168.100.8:3000/admin` |
 
 ---
 

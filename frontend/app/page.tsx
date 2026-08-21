@@ -249,8 +249,8 @@ export default function LoginPage() {
       {/* Hero Welcome Banner */}
       <div className="text-center space-y-4 animate-fadeSlideIn">
         <div className="flex justify-center">
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-[#418ccd]/40 shadow-xl shadow-[#418ccd]/20">
-            <img src="/nlc-logo.png" alt="New Life College" className="w-full h-full object-cover" />
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-[#418ccd]/40 shadow-xl shadow-[#418ccd]/20 bg-white flex items-center justify-center p-2">
+            <img src="/nlc-logo.png" alt="New Life College" className="w-full h-full object-contain object-center" />
           </div>
         </div>
         <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-[#ffb606]/15 border border-[#ffb606]/35 text-[#ffb606] text-xs font-bold">
